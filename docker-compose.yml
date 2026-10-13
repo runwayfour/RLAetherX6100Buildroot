@@ -1,25 +1,41 @@
-version: "3.4"
+# Docker-based build environment. Drive it through the top-level Makefile
+# (`make help`), or open a shell with `make shell`.
+#
+# Layout inside the container:
+#   /work/AetherX6100Buildroot   this repo (bind mount)
+#   /work/x6100_gui              sibling GUI checkout (bind mount, see X6100_GUI_DIR)
+#   /work/AetherX6100Buildroot/build   Buildroot output dir  (named volume)
+#   /br/dl                       Buildroot download cache   (named volume)
+#   /root/.buildroot-ccache      ccache                     (named volume)
+#
+# The build output, downloads and ccache live in named Docker volumes rather
+# than bind mounts on purpose: macOS bind mounts are much slower, and the
+# default case-insensitive APFS breaks Linux kernel and toolchain builds.
 
 services:
   buildroot:
     build:
+      context: .
       dockerfile: Dockerfile
-    stop_signal: SIGKILL
+    image: x6100-buildroot
+    command: ["sleep", "infinity"]
+    working_dir: /work/AetherX6100Buildroot
+    environment:
+      BR2_DL_DIR: /br/dl
+      FORCE_UNSAFE_CONFIGURE: "1"
+      JOBS: ${JOBS:-}
+      CCACHE_SIZE: ${CCACHE_SIZE:-8G}
+      USE_PREBUILT_UBOOT: ${USE_PREBUILT_UBOOT:-1}
     volumes:
-      - .:/workspace:cached
+      - .:/work/AetherX6100Buildroot
+      - ${X6100_GUI_DIR:-../x6100_gui}:/work/x6100_gui
+      - br_build:/work/AetherX6100Buildroot/build
+      - br_dl:/br/dl
+      - br_ccache:/root/.buildroot-ccache
       - vscode_server:/root/.vscode-server
-      - build_output:/workspace/build
-      - buildroot_dir:/workspace/buildroot-2022.11
-      - buildroot_cache:/root/.buildroot-ccache
-    restart: always
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "200k"
-        max-file: "10"
 
 volumes:
+  br_build:
+  br_dl:
+  br_ccache:
   vscode_server:
-  build_output:
-  buildroot_dir:
-  buildroot_cache:
